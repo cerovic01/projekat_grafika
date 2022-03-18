@@ -198,7 +198,7 @@ int main() {
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(1.0f, 3.0, 1.0);
-    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
+    pointLight.ambient = glm::vec3(0.4, 0.4, 0.4);
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
     pointLight.constant = 0.7f;
@@ -210,7 +210,7 @@ int main() {
     spotLight.direction = programState->camera.Front;
     spotLight.ambient = glm::vec3 (1.0f, 1.0f, 1.0f);
     spotLight.diffuse = glm::vec3 (0.7f, 0.7f, 0.7f);
-    spotLight.specular = glm::vec3 (1.0f, 1.0f, 1.0f);
+    spotLight.specular = glm::vec3 (0.5f, 0.5f, 0.5f);
     spotLight.constant = 1.0f;
     spotLight.linear = 0.05f;
     spotLight.quadratic = 0.012f;
@@ -317,8 +317,21 @@ int main() {
             1.0f, -1.0f,  1.0f
     };
 
+    // floor coordinates
+    float floorVertices[] = {
+            // positions          // normals          // texture coords
+            0.5f,  0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  50.0f,  50.0f,  // top right
+            0.5f, -0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  50.0f,  0.0f,  // bottom right
+            -0.5f, -0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  0.0f,  0.0f,  // bottom left
+            -0.5f,  0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  0.0f,  50.0f   // top left
+    };
 
-    //cube VAO (and VBO)
+    unsigned int floorIndices[] = {
+            0, 1, 3,  // first Triangle
+            1, 2, 3   // second Triangle
+    };
+
+    //cube VAO
     unsigned int VBO, cubeVAO;
     glGenVertexArrays(1, &cubeVAO);
     glGenBuffers(1, &VBO);
@@ -345,7 +358,26 @@ int main() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    //load textures
+    // Floor VAO
+    unsigned int floorVAO, floorVBO, floorEBO;
+    glGenVertexArrays(1, &floorVAO);
+    glGenBuffers(1, &floorVBO);
+    glGenBuffers(1, &floorEBO);
+
+    glBindVertexArray(floorVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(floorVertices), floorVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, floorEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(floorIndices), floorIndices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6*sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    //load box textures
     unsigned int diffuseMap  = loadTexture(FileSystem::getPath("resources/textures/box.png").c_str());
     unsigned int specularMap = loadTexture(FileSystem::getPath("resources/textures/box_specular.png").c_str());
 
@@ -353,6 +385,7 @@ int main() {
     ourShader.setInt("material.texture_diffuse1", 0);
     ourShader.setInt("material.texture_specular1", 1);
 
+    //load skybox textures
     vector<std::string> skyboxFaces{
             FileSystem::getPath("resources/textures/right.jpg"),
             FileSystem::getPath("resources/textures/left.jpg"),
@@ -366,6 +399,10 @@ int main() {
 
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
+
+    //load floor textures
+    unsigned int floorDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/trava.jpg").c_str());
+    unsigned int floorSpecularMap = loadTexture(FileSystem::getPath("resources/textures/travaspec.png").c_str());
 
 
     // load models
@@ -477,10 +514,39 @@ int main() {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
 
-        ourShader.setFloat("material.shininess", 32.0f);
+        ourShader.setFloat("material.shininess", 300.0f);
 
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+
+
+        // floor setup
+        ourShader.setVec3("pointLight.specular", 0.01f, 0.03f, 0.01f);
+        ourShader.setVec3("dirLight.specular", 0.01f, 0.03f, 0.01f);
+        ourShader.setFloat("material.shininess", 1.5f);
+
+        // world transformation
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -0.335, 0.0f));
+        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(100.0f));
+        ourShader.setMat4("model", model);
+
+        // bind diffuse map
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, floorDiffuseMap);
+
+        // bind specular map
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, floorSpecularMap);
+
+        // render floor
+        glBindVertexArray(floorVAO);
+        glEnable(GL_CULL_FACE);     // floor won't be visible if looked from bellow
+        glCullFace(GL_BACK);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
+        glDisable(GL_CULL_FACE);
+
 
 
         //draw skybox
