@@ -225,6 +225,7 @@ int main() {
     // -------------------------
     Shader ourShader(FileSystem::getPath("resources/shaders/2.model_lighting.vs").c_str(), FileSystem::getPath("resources/shaders/2.model_lighting.fs").c_str());
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
+    Shader blendingShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
 
     //cube
     float vertices[] = {
@@ -331,6 +332,17 @@ int main() {
             1, 2, 3   // second Triangle
     };
 
+    float transparentVertices[] = {
+            // positions         // texture coords
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+
+            0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+            1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+            1.0f,  0.5f,  0.0f,  1.0f,  0.0f
+    };
+
     //cube VAO
     unsigned int VBO, cubeVAO;
     glGenVertexArrays(1, &cubeVAO);
@@ -377,6 +389,19 @@ int main() {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6*sizeof(float)));
     glEnableVertexAttribArray(2);
 
+    //transparent VAO
+    unsigned int transparentVAO, transparentVBO;
+    glGenVertexArrays(1, &transparentVAO);
+    glGenBuffers(1, &transparentVBO);
+    glBindVertexArray(transparentVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    //glBindVertexArray(0);
+
     //load box textures
     unsigned int diffuseMap  = loadTexture(FileSystem::getPath("resources/textures/box.png").c_str());
     unsigned int specularMap = loadTexture(FileSystem::getPath("resources/textures/box_specular.png").c_str());
@@ -404,7 +429,19 @@ int main() {
     unsigned int floorDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/trava.jpg").c_str());
     unsigned int floorSpecularMap = loadTexture(FileSystem::getPath("resources/textures/travaspec.png").c_str());
 
+    //load grass texture
+    unsigned int transparentTexture = loadTexture(FileSystem::getPath("resources/textures/grass.png").c_str());
+    unsigned int transparentTexture1 = loadTexture(FileSystem::getPath("resources/textures/grass1.png").c_str());
 
+    blendingShader.use();
+    blendingShader.setInt("texture1", 0);
+
+    vector<glm::vec3> grassPos {
+        glm::vec3 (-1.5f, 0.0f, -2.0f),
+        glm::vec3 (1.5f, 0.0f, -2.0f),
+        glm::vec3 (2.5f, 0.0f, -2.0f),
+        glm::vec3 (-0.7f, 0.0f, 0.335f)
+    };
     // load models
     // -----------
 
@@ -416,6 +453,7 @@ int main() {
 
     unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/objects/cottage/cottage_diffuse.png").c_str());
 */
+
 
     Model nanosuit(FileSystem::getPath("resources/objects/nanosuit/nanosuit.obj"));
     nanosuit.SetShaderTextureNamePrefix("material.");
@@ -439,7 +477,6 @@ int main() {
         // ------
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
 
         // don't forget to enable shader before setting uniforms
@@ -489,6 +526,7 @@ int main() {
 
       /*  if (programState->ImGuiEnabled)
             DrawImGui(programState);*/
+
 
         //model
         glm::mat4 model = glm::mat4(1.0f);
@@ -547,7 +585,31 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
         glDisable(GL_CULL_FACE);
 
+        //grass
+        blendingShader.use();
+        glBindVertexArray(transparentVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, transparentTexture);
 
+        projection = glm::perspective(glm::radians(programState->camera.Zoom),
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+        view = programState->camera.GetViewMatrix();
+
+        blendingShader.setMat4("projection", projection);
+        blendingShader.setMat4("view", view);
+
+        for (unsigned int i = 0; i < grassPos.size(); i++) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, grassPos[i]);
+            blendingShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+
+        glBindTexture(GL_TEXTURE_2D, transparentTexture1);
+        model = glm::translate(model, glm::vec3 (-1.3f, 0.0f, 0.235f));
+        blendingShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //draw skybox
         glDepthMask(GL_FALSE);
