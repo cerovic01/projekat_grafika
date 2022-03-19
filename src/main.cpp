@@ -191,14 +191,14 @@ int main() {
 
     //light
     DirLight& dirLight = programState->dirLight;
-    dirLight.direction = glm::vec3(1.0, -0.5, 0.0);
+    dirLight.direction = glm::vec3(10.0, 10, 0.0);
     dirLight.ambient = glm::vec3(0.1, 0.1, 0.1);
-    dirLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
+    dirLight.diffuse = glm::vec3(0.1);
     dirLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
     PointLight& pointLight = programState->pointLight;
-    pointLight.position = glm::vec3(1.0f, 3.0, 1.0);
-    pointLight.ambient = glm::vec3(0.4, 0.4, 0.4);
+    pointLight.position = glm::vec3(2.6, 1.6, 0.0);
+    pointLight.ambient = glm::vec3(0.8);
     pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
     pointLight.constant = 0.7f;
@@ -437,11 +437,29 @@ int main() {
     blendingShader.setInt("texture1", 0);
 
     vector<glm::vec3> grassPos {
-        glm::vec3 (-1.5f, 0.0f, -2.0f),
-        glm::vec3 (1.5f, 0.0f, -2.0f),
-        glm::vec3 (2.5f, 0.0f, -2.0f),
+        //glm::vec3 (-1.5f, 0.0f, -2.0f),
+        //glm::vec3 (1.5f, 0.0f, -2.0f),
+        //glm::vec3 (2.5f, 0.0f, -2.0f),
         glm::vec3 (-0.7f, 0.0f, 0.335f)
     };
+
+    vector<glm::vec3> lampPos {
+        glm::vec3(3, -0.335, 0),
+        glm::vec3(-0.5, -0.335, 2),
+        glm::vec3(3, -0.335, -4),
+        glm::vec3(-0.5, -0.335, -2),
+        glm::vec3(3, -0.335, -8),
+        glm::vec3(-0.5, -0.335, -6),
+        glm::vec3(3, -0.335, -12),
+        glm::vec3(-0.5, -0.335, -10),
+        glm::vec3(3, -0.335, 0-16),
+        glm::vec3(-0.5, -0.335, -14),
+        glm::vec3(3, -0.335, -20),
+        glm::vec3(-0.5, -0.335, -18)
+    };
+
+
+
     // load models
     // -----------
 
@@ -540,13 +558,13 @@ int main() {
         nanosuit.Draw(ourShader);
 
         //lamp
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(3, -0.335, 0));
-        model = glm::scale(model, glm::vec3 (0.2f));
-
-        ourShader.setMat4("model", model);
-
-        lamp.Draw(ourShader);
+        for (unsigned int i = 0; i < lampPos.size(); i++) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, lampPos[i]);
+            model = glm::scale(model, glm::vec3(0.2f));
+            ourShader.setMat4("model", model);
+            lamp.Draw(ourShader);
+        }
 
 
         //draw cube
@@ -563,7 +581,7 @@ int main() {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
 
-        ourShader.setFloat("material.shininess", 300.0f);
+        ourShader.setFloat("material.shininess", 200.0f);
 
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -619,8 +637,7 @@ int main() {
 
 
         glBindTexture(GL_TEXTURE_2D, transparentTexture1);
-        model = glm::translate(model, glm::vec3 (4.6f, 0.0f, -0.3f));
-        //model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::translate(model,  glm::vec3 (4.6f, 0.0f, -0.3f));
         blendingShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
