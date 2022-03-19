@@ -458,6 +458,8 @@ int main() {
     Model nanosuit(FileSystem::getPath("resources/objects/nanosuit/nanosuit.obj"));
     nanosuit.SetShaderTextureNamePrefix("material.");
 
+    Model lamp(FileSystem::getPath("resources/objects/lamp/streetlamp.obj"));
+    lamp.SetShaderTextureNamePrefix("material.");
 
     // render loop
     // -----------
@@ -537,6 +539,15 @@ int main() {
 
         nanosuit.Draw(ourShader);
 
+        //lamp
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(3, -0.335, 0));
+        model = glm::scale(model, glm::vec3 (0.2f));
+
+        ourShader.setMat4("model", model);
+
+        lamp.Draw(ourShader);
+
 
         //draw cube
         model = glm::mat4(1.0f);
@@ -601,13 +612,15 @@ int main() {
         for (unsigned int i = 0; i < grassPos.size(); i++) {
             model = glm::mat4(1.0f);
             model = glm::translate(model, grassPos[i]);
+            model = glm::scale(model, glm::vec3(0.65f));
             blendingShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
 
         glBindTexture(GL_TEXTURE_2D, transparentTexture1);
-        model = glm::translate(model, glm::vec3 (-1.3f, 0.0f, 0.235f));
+        model = glm::translate(model, glm::vec3 (4.6f, 0.0f, -0.3f));
+        //model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         blendingShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
