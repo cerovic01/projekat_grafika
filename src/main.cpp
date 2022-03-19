@@ -196,14 +196,16 @@ int main() {
     dirLight.diffuse = glm::vec3(0.1);
     dirLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
+
     PointLight& pointLight = programState->pointLight;
-    pointLight.position = glm::vec3(2.6, 1.6, 0.0);
-    pointLight.ambient = glm::vec3(0.8);
-    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
-    pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
-    pointLight.constant = 0.7f;
-    pointLight.linear = 0.05f;
-    pointLight.quadratic = 0.022f;
+    //pointLight.position = glm::vec3(2.6, 1.6, 0.0);
+    pointLight.ambient = glm::vec3(0.3);
+    pointLight.diffuse = glm::vec3(0.9);
+    pointLight.specular = glm::vec3(1.0);
+    pointLight.constant = 0.2f;
+    pointLight.linear = 0.23f;
+    pointLight.quadratic = 0.352f;
+
 
     SpotLight& spotLight = programState->spotLight;
     spotLight.position = programState->camera.Position;
@@ -453,9 +455,19 @@ int main() {
         glm::vec3(3, -0.335, -12),
         glm::vec3(-0.5, -0.335, -10),
         glm::vec3(3, -0.335, 0-16),
-        glm::vec3(-0.5, -0.335, -14),
-        glm::vec3(3, -0.335, -20),
-        glm::vec3(-0.5, -0.335, -18)
+        glm::vec3(-0.5, -0.335, -14)
+    };
+    vector<glm::vec3> lightPos {
+            glm::vec3(2.6, 1.6, 0),
+            glm::vec3(-0.9, 1.6, 2),
+            glm::vec3(2.6, 1.6, -4),
+            glm::vec3(-0.9, 1.6, -2),
+            glm::vec3(2.6, 1.6, -8),
+            glm::vec3(-0.9, 1.6, -6),
+            glm::vec3(2.6, 1.6, -12),
+            glm::vec3(-0.9, 1.6, -10),
+            glm::vec3(2.6, 1.6, 0-16),
+            glm::vec3(-0.9, 1.6, -14)
     };
 
 
@@ -510,13 +522,87 @@ int main() {
 
        // pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
 
-        ourShader.setVec3("pointLight.position", pointLight.position);
-        ourShader.setVec3("pointLight.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight.specular", pointLight.specular);
-        ourShader.setFloat("pointLight.constant", pointLight.constant);
-        ourShader.setFloat("pointLight.linear", pointLight.linear);
-        ourShader.setFloat("pointLight.quadratic", pointLight.quadratic);
+
+       ourShader.setVec3("pointLight1.position", lightPos[0]);
+       ourShader.setVec3("pointLight1.ambient", pointLight.ambient);
+       ourShader.setVec3("pointLight1.diffuse", pointLight.diffuse);
+       ourShader.setVec3("pointLight1.specular", pointLight.specular);
+       ourShader.setFloat("pointLight1.constant", pointLight.constant);
+       ourShader.setFloat("pointLight1.linear", pointLight.linear);
+       ourShader.setFloat("pointLight1.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight2.position", lightPos[1]);
+        ourShader.setVec3("pointLight2.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight2.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight2.specular", pointLight.specular);
+        ourShader.setFloat("pointLight2.constant", pointLight.constant);
+        ourShader.setFloat("pointLight2.linear", pointLight.linear);
+        ourShader.setFloat("pointLight2.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight3.position", lightPos[2]);
+        ourShader.setVec3("pointLight3.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight3.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight3.specular", pointLight.specular);
+        ourShader.setFloat("pointLight3.constant", pointLight.constant);
+        ourShader.setFloat("pointLight3.linear", pointLight.linear);
+        ourShader.setFloat("pointLight3.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight4.position", lightPos[3]);
+        ourShader.setVec3("pointLight4.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight4.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight4.specular", pointLight.specular);
+        ourShader.setFloat("pointLight4.constant", pointLight.constant);
+        ourShader.setFloat("pointLight4.linear", pointLight.linear);
+        ourShader.setFloat("pointLight4.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight5.position", lightPos[4]);
+        ourShader.setVec3("pointLight5.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight5.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight5.specular", pointLight.specular);
+        ourShader.setFloat("pointLight5.constant", pointLight.constant);
+        ourShader.setFloat("pointLight5.linear", pointLight.linear);
+        ourShader.setFloat("pointLight5.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight6.position", lightPos[5]);
+        ourShader.setVec3("pointLight6.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight6.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight6.specular", pointLight.specular);
+        ourShader.setFloat("pointLight6.constant", pointLight.constant);
+        ourShader.setFloat("pointLight6.linear", pointLight.linear);
+        ourShader.setFloat("pointLight6.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight7.position", lightPos[6]);
+        ourShader.setVec3("pointLight7.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight7.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight7.specular", pointLight.specular);
+        ourShader.setFloat("pointLight7.constant", pointLight.constant);
+        ourShader.setFloat("pointLight7.linear", pointLight.linear);
+        ourShader.setFloat("pointLight7.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight8.position", lightPos[7]);
+        ourShader.setVec3("pointLight8.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight8.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight8.specular", pointLight.specular);
+        ourShader.setFloat("pointLight8.constant", pointLight.constant);
+        ourShader.setFloat("pointLight8.linear", pointLight.linear);
+        ourShader.setFloat("pointLight8.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight9.position", lightPos[8]);
+        ourShader.setVec3("pointLight9.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight9.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight9.specular", pointLight.specular);
+        ourShader.setFloat("pointLight9.constant", pointLight.constant);
+        ourShader.setFloat("pointLight9.linear", pointLight.linear);
+        ourShader.setFloat("pointLight9.quadratic", pointLight.quadratic);
+
+        ourShader.setVec3("pointLight10.position", lightPos[9]);
+        ourShader.setVec3("pointLight10.ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight10.diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight10.specular", pointLight.specular);
+        ourShader.setFloat("pointLight10.constant", pointLight.constant);
+        ourShader.setFloat("pointLight10.linear", pointLight.linear);
+        ourShader.setFloat("pointLight10.quadratic", pointLight.quadratic);
+
 
         ourShader.setVec3("viewPosition", programState->camera.Position);
         ourShader.setFloat("material.shininess", 32.0f);
@@ -588,9 +674,9 @@ int main() {
 
 
         // floor setup
-        ourShader.setVec3("pointLight.specular", 0.01f, 0.03f, 0.01f);
+        //ourShader.setVec3("pointLight.specular", 0.01f, 0.03f, 0.01f);
         ourShader.setVec3("dirLight.specular", 0.01f, 0.03f, 0.01f);
-        ourShader.setFloat("material.shininess", 1.5f);
+        ourShader.setFloat("material.shininess", 10.0f);
 
         // world transformation
         model = glm::mat4(1.0f);
