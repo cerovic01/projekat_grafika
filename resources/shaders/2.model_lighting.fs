@@ -64,6 +64,7 @@ uniform Material material;
 
 uniform SpotLight spotLight;
 uniform bool lightOn;
+uniform bool pointLightOn;
 
 uniform vec3 viewPosition;
 
@@ -136,6 +137,7 @@ void main()
 
     vec3 result = CalcDirLight(dirLight, normal, viewDir);
 
+    if(pointLightOn){
         result += CalcPointLight(pointLight1, normal, FragPos, viewDir);
         result += CalcPointLight(pointLight2, normal, FragPos, viewDir);
         result += CalcPointLight(pointLight3, normal, FragPos, viewDir);
@@ -146,6 +148,7 @@ void main()
         result += CalcPointLight(pointLight8, normal, FragPos, viewDir);
         result += CalcPointLight(pointLight9, normal, FragPos, viewDir);
         result += CalcPointLight(pointLight10, normal, FragPos, viewDir);
+    }
 
     if(lightOn)
         result += CalcSpotLight(spotLight, normal, FragPos, viewDir);
