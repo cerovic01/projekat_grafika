@@ -301,4 +301,6 @@ _deps
 # External projects
 *-prefix/
 
+./resources/program_state.txt
+
 # End of https://www.toptal.com/developers/gitignore/api/c++,cmake,clion,clion+all,clion+iml,c
