@@ -38,6 +38,8 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 bool lightOn = false;
 bool lKeyPressed = false;
+bool pointLightOn = true;
+bool kKeyPressed = false;
 
 // camera
 
@@ -195,9 +197,9 @@ int main() {
 
     //light
     DirLight& dirLight = programState->dirLight;
-    dirLight.direction = glm::vec3(10.0, 10, 0.0);
-    dirLight.ambient = glm::vec3(0.1, 0.1, 0.1);
-    dirLight.diffuse = glm::vec3(0.1);
+    dirLight.direction = glm::vec3(-40.0f, -20.0f, 70.0f);
+    dirLight.ambient = glm::vec3(0.04);
+    dirLight.diffuse = glm::vec3(0.3, 0.15, 0.0);
     dirLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
 
@@ -232,6 +234,7 @@ int main() {
     Shader ourShader(FileSystem::getPath("resources/shaders/2.model_lighting.vs").c_str(), FileSystem::getPath("resources/shaders/2.model_lighting.fs").c_str());
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
     Shader blendingShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
+    Shader moonShader(FileSystem::getPath("resources/shaders/moon.vs").c_str(), FileSystem::getPath("resources/shaders/moon.fs").c_str());
 
     //cube
     float vertices[] = {
@@ -451,12 +454,12 @@ int main() {
 
     //load skybox textures
     vector<std::string> skyboxFaces{
-            FileSystem::getPath("resources/textures/right.jpg"),
-            FileSystem::getPath("resources/textures/left.jpg"),
-            FileSystem::getPath("resources/textures/top.jpg"),
-            FileSystem::getPath("resources/textures/bottom.jpg"),
-            FileSystem::getPath("resources/textures/front.jpg"),
-            FileSystem::getPath("resources/textures/back.jpg")
+            FileSystem::getPath("resources/textures/right1.jpg"),
+            FileSystem::getPath("resources/textures/left1.jpg"),
+            FileSystem::getPath("resources/textures/top1.jpg"),
+            FileSystem::getPath("resources/textures/bottom1.jpg"),
+            FileSystem::getPath("resources/textures/front1.jpg"),
+            FileSystem::getPath("resources/textures/back1.jpg")
     };
 
     unsigned int cubemapTexture = loadCubemap(skyboxFaces);
@@ -554,6 +557,9 @@ int main() {
     Model lamp(FileSystem::getPath("resources/objects/lamp/streetlamp.obj"));
     lamp.SetShaderTextureNamePrefix("material.");
 
+    Model moon(FileSystem::getPath("resources/objects/moon/planet.obj"));
+    moon.SetShaderTextureNamePrefix("material.");
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)) {
@@ -585,7 +591,7 @@ int main() {
 
        // pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
 
-
+       ourShader.setInt("pointLightOn", pointLightOn);
        ourShader.setVec3("pointLight1.position", lightPos[0]);
        ourShader.setVec3("pointLight1.ambient", pointLight.ambient);
        ourShader.setVec3("pointLight1.diffuse", pointLight.diffuse);
@@ -715,8 +721,17 @@ int main() {
             lamp.Draw(ourShader);
         }
 
+        //moon
+        moonShader.use();
+        moonShader.setMat4("projection", projection);
+        moonShader.setMat4("view", view);
+        model = glm::mat4 (1.0f);
+        model = glm::translate(model, glm::vec3(40.0f, 20.0f, -70.0f));
+        moonShader.setMat4("model", model);
+        moon.Draw(moonShader);
 
         //draw cube
+        ourShader.use();
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0, 0.0, 0.0));
         model = glm::scale(model, glm::vec3(0.65f));
@@ -871,6 +886,15 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_L) == GLFW_RELEASE)
     {
         lKeyPressed = false;
+    }
+    //point light
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS && !kKeyPressed){
+        pointLightOn = !pointLightOn;
+        kKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
+    {
+        kKeyPressed = false;
     }
 }
 
