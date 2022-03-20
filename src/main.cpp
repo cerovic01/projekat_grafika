@@ -15,7 +15,7 @@
 #include <learnopengl/model.h>
 
 #include <iostream>
-
+// Neki komentar
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
@@ -188,7 +188,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-   // glEnable(GL_MULTISAMPLE);
+    glEnable(GL_MULTISAMPLE);
 
     //light
     DirLight& dirLight = programState->dirLight;
@@ -949,6 +949,13 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
     }
+
+    if (key == GLFW_KEY_F2 && action == GLFW_PRESS) {
+              glEnable(GL_MULTISAMPLE);
+    }
+    if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+           glDisable(GL_MULTISAMPLE);
+          }
 }
 
 //void key_callback2(GLFWwindow *window, int key, int scancode, int action, int mod) {
