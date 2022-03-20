@@ -15,7 +15,8 @@
 #include <learnopengl/model.h>
 
 #include <iostream>
-// Neki komentar
+// Neki komentar123
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
