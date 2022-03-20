@@ -772,8 +772,10 @@ int main() {
 
         // render floor
         glBindVertexArray(floorVAO);
-        glEnable(GL_CULL_FACE);     // floor won't be visible if looked from bellow
+
+        glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
+
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
         glDisable(GL_CULL_FACE);
 
