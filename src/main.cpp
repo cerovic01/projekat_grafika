@@ -25,7 +25,7 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
-
+//void key_callback2(GLFWwindow *window, int key, int scancode, int action, int mod);
 unsigned int loadTexture(const char *path);
 
 unsigned int loadCubemap(vector<std::string> skyboxFaces);
@@ -137,7 +137,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
+    glfwWindowHint(GLFW_SAMPLES,4);
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -155,6 +155,7 @@ int main() {
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetKeyCallback(window, key_callback);
+   // glfwSetKeyCallback(window, key_callback2);
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -187,7 +188,7 @@ int main() {
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-
+   // glEnable(GL_MULTISAMPLE);
 
     //light
     DirLight& dirLight = programState->dirLight;
@@ -323,13 +324,26 @@ int main() {
     // floor coordinates
     float floorVertices[] = {
             // positions          // normals          // texture coords
-            0.5f,  0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  50.0f,  50.0f,  // top right
-            0.5f, -0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  50.0f,  0.0f,  // bottom right
-            -0.5f, -0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  0.0f,  0.0f,  // bottom left
-            -0.5f,  0.5f,  0.0f,  0.0f, 0.0f, -1.0f,  0.0f,  50.0f   // top left
+            0.5f,  0.5f,  0.0001f,  0.0f, 0.0f, -1.0f,  50.0f,  50.0f,  // top right
+            0.5f, -0.5f,  0.0001f,  0.0f, 0.0f, -1.0f,  50.0f,  0.0f,  // bottom right
+            -0.5f, -0.5f,  0.0001f,  0.0f, 0.0f, -1.0f,  0.0f,  0.0f,  // bottom left
+            -0.5f,  0.5f,  0.0001f,  0.0f, 0.0f, -1.0f,  0.0f,  50.0f   // top left
     };
 
     unsigned int floorIndices[] = {
+            0, 1, 3,  // first Triangle
+            1, 2, 3   // second Triangle
+    };
+    // floor coordinates
+    float putVertices[] = {
+            // positions          // normals          // texture coords
+            0.031f, 0.05f,  0.0f,  0.0f, 0.0f, -1.0f,  8.0f,  3.0f,  // top right
+            0.031f, -0.2f,  0.0f,  0.0f, 0.0f, -1.0f,  8.0f,  9.0f,  // bottom right
+            -0.013f, -0.2f,  0.0f,  0.0f, 0.0f, -1.0f,  9.0f,  9.0f,  // bottom left
+            -0.013f,  0.05f,  0.0f,  0.0f, 0.0f, -1.0f,  9.0f,  3.0f   // top left
+    };
+
+    unsigned int putIndices[] = {
             0, 1, 3,  // first Triangle
             1, 2, 3   // second Triangle
     };
@@ -391,6 +405,26 @@ int main() {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6*sizeof(float)));
     glEnableVertexAttribArray(2);
 
+
+    //put
+    unsigned int putVAO, putVBO, putEBO;
+    glGenVertexArrays(1, &putVAO);
+    glGenBuffers(1, &putVBO);
+    glGenBuffers(1, &putEBO);
+
+    glBindVertexArray(putVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, putVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(putVertices), putVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, putEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(putIndices), putIndices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6*sizeof(float)));
+    glEnableVertexAttribArray(2);
+
     //transparent VAO
     unsigned int transparentVAO, transparentVBO;
     glGenVertexArrays(1, &transparentVAO);
@@ -427,6 +461,10 @@ int main() {
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
+    //load put textures
+    unsigned int putDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/stone_box.jpg").c_str());
+    unsigned int putSpecularMap = loadTexture(FileSystem::getPath("resources/textures/stone_specular.png").c_str());
+
     //load floor textures
     unsigned int floorDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/trava.jpg").c_str());
     unsigned int floorSpecularMap = loadTexture(FileSystem::getPath("resources/textures/travaspec.png").c_str());
@@ -442,7 +480,29 @@ int main() {
         //glm::vec3 (-1.5f, 0.0f, -2.0f),
         //glm::vec3 (1.5f, 0.0f, -2.0f),
         //glm::vec3 (2.5f, 0.0f, -2.0f),
-        glm::vec3 (-0.7f, 0.0f, 0.335f)
+            glm::vec3(2.3, 0, 0.15),
+            glm::vec3(-1.2, 0, 2.15),
+            glm::vec3(2.3, 0, -4.15),
+            glm::vec3(-1.2, 0, -2.15),
+            glm::vec3(2.3, 0, -8.15),
+            glm::vec3(-1.2, 0, -6.15),
+            glm::vec3(2.3, 0, -12.15),
+            glm::vec3(-1.2, 0, -10.15),
+            glm::vec3(2.3, 0, -16.15),
+            glm::vec3(-1.2, 0, -14.15),
+
+            glm::vec3(2.3, 0, -0.15),
+            glm::vec3(-1.2, 0, 1.85),
+            glm::vec3(2.3, 0, -3.85),
+            glm::vec3(-1.2, 0, -1.85),
+            glm::vec3(2.3, 0, -7.85),
+            glm::vec3(-1.2, 0, -5.85),
+            glm::vec3(2.3, 0, -11.85),
+            glm::vec3(-1.2, 0, -9.85),
+            glm::vec3(2.3, 0, -15.85),
+            glm::vec3(-1.2, 0, -13.85)
+
+
     };
 
     vector<glm::vec3> lampPos {
@@ -700,6 +760,22 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
         glDisable(GL_CULL_FACE);
 
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, putDiffuseMap);
+
+        // bind specular map
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, putSpecularMap);
+
+        // render floor
+        glBindVertexArray(putVAO);
+        glEnable(GL_CULL_FACE);     // floor won't be visible if looked from bellow
+        glCullFace(GL_BACK);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
+        glDisable(GL_CULL_FACE);
+
+
         //grass
         blendingShader.use();
         glBindVertexArray(transparentVAO);
@@ -722,10 +798,10 @@ int main() {
         }
 
 
-        glBindTexture(GL_TEXTURE_2D, transparentTexture1);
-        model = glm::translate(model,  glm::vec3 (4.6f, 0.0f, -0.3f));
-        blendingShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+      //  glBindTexture(GL_TEXTURE_2D, transparentTexture1);
+     //   model = glm::translate(model,  glm::vec3 (4.6f, 0.0f, -0.3f));
+       // blendingShader.setMat4("model", model);
+      //  glDrawArrays(GL_TRIANGLES, 0, 6);
 
         //draw skybox
         glDepthMask(GL_FALSE);
@@ -874,6 +950,15 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
         }
     }
 }
+
+//void key_callback2(GLFWwindow *window, int key, int scancode, int action, int mod) {
+ //   if (key == GLFW_KEY_F2 && action == GLFW_PRESS) {
+ //       glEnable(GL_MULTISAMPLE);
+ //   }
+ //   if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+   //     glDisable(GL_MULTISAMPLE);
+  //  }
+//}
 
 unsigned int loadTexture(char const * path)
 {
