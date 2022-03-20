@@ -539,9 +539,6 @@ int main() {
 
 
     // load models
-    Model nanosuit(FileSystem::getPath("resources/objects/nanosuit/nanosuit.obj"));
-    nanosuit.SetShaderTextureNamePrefix("material.");
-
     Model lamp(FileSystem::getPath("resources/objects/lamp/streetlamp.obj"));
     lamp.SetShaderTextureNamePrefix("material.");
 
@@ -694,18 +691,9 @@ int main() {
             DrawImGui(programState);*/
 
 
-        //model
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0, 0.335, 0));
-        model = glm::scale(model, glm::vec3 (0.1f));
-
-        ourShader.setMat4("model", model);
-
-        nanosuit.Draw(ourShader);
-
         //lamp
         for (unsigned int i = 0; i < lampPos.size(); i++) {
-            model = glm::mat4(1.0f);
+            glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, lampPos[i]);
             model = glm::scale(model, glm::vec3(0.2f));
             ourShader.setMat4("model", model);
@@ -713,7 +701,7 @@ int main() {
         }
 
         //cottage
-        model = glm::mat4 (1.0f);
+        glm::mat4 model = glm::mat4 (1.0f);
         model = glm::translate(model, glm::vec3(1.0, -0.335, -21.0));
         model = glm::rotate(model, glm::radians(270.0f), glm::vec3(0.0, 1.0, 0.0));
         model = glm::scale(model, glm::vec3(0.5f));
