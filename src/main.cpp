@@ -545,8 +545,8 @@ int main() {
     Model moon(FileSystem::getPath("resources/objects/moon/planet.obj"));
     moon.SetShaderTextureNamePrefix("material.");
 
-  //  Model cottage(FileSystem::getPath("resources/objects/cottage/cottage.obj"));
-  //  cottage.SetShaderTextureNamePrefix("material.");
+    Model house(FileSystem::getPath("resources/objects/house/farmhouse_obj.obj"));
+    house.SetShaderTextureNamePrefix("material.");
 
     // render loop
     // -----------
@@ -700,20 +700,20 @@ int main() {
             lamp.Draw(ourShader);
         }
 
-        //cottage
-     //   model = glm::mat4 (1.0f);
-       // model = glm::translate(model, glm::vec3(1.0, -0.335, -21.0));
-      //  model = glm::rotate(model, glm::radians(270.0f), glm::vec3(0.0, 1.0, 0.0));
-       // model = glm::scale(model, glm::vec3(0.5f));
-       // ourShader.setMat4("model", model);
-       // cottage.Draw(ourShader);
-       //koment
+        //house
+        glm::mat4 model = glm::mat4 (1.0f);
+        model = glm::translate(model, glm::vec3(1.0, -0.335, -21.0));
+        model = rotate(model, glm::radians(180.0f),glm::vec3(0.0, 1.0, 0.0));
+        model = glm::scale(model, glm::vec3(0.2f));
+        ourShader.setMat4("model", model);
+        house.Draw(ourShader);
+
 
         //moon
         moonShader.use();
         moonShader.setMat4("projection", projection);
         moonShader.setMat4("view", view);
-        glm::mat4 model = glm::mat4 (1.0f);
+        model = glm::mat4 (1.0f);
         model = glm::translate(model, glm::vec3(40.0f, 20.0f, -70.0f));
         moonShader.setMat4("model", model);
         moon.Draw(moonShader);
