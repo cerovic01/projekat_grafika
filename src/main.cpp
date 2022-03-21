@@ -707,6 +707,7 @@ int main() {
        // model = glm::scale(model, glm::vec3(0.5f));
        // ourShader.setMat4("model", model);
        // cottage.Draw(ourShader);
+       //koment
 
         //moon
         moonShader.use();
