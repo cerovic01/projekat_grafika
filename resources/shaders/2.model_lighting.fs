@@ -60,6 +60,8 @@ uniform PointLight pointLight8;
 uniform PointLight pointLight9;
 uniform PointLight pointLight10;
 
+uniform PointLight lampion;
+
 uniform Material material;
 
 uniform SpotLight spotLight;
@@ -136,6 +138,8 @@ void main()
     vec3 viewDir = normalize(viewPosition - FragPos);
 
     vec3 result = CalcDirLight(dirLight, normal, viewDir);
+
+    result += CalcPointLight(lampion, normal, FragPos, viewDir);
 
     if(pointLightOn){
         result += CalcPointLight(pointLight1, normal, FragPos, viewDir);
