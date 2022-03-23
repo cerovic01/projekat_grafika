@@ -545,11 +545,14 @@ int main() {
     Model moon(FileSystem::getPath("resources/objects/moon/planet.obj"));
     moon.SetShaderTextureNamePrefix("material.");
 
+
     Model house(FileSystem::getPath("resources/objects/house/farmhouse_obj.obj"));
     house.SetShaderTextureNamePrefix("material.");
 
     Model lampion(FileSystem::getPath("resources/objects/lampion/light.obj"));
     lampion.SetShaderTextureNamePrefix("material.");
+
+
 
     // render loop
     // -----------
@@ -659,6 +662,19 @@ int main() {
             ourShader.setMat4("model", model);
             lamp.Draw(ourShader);
         }
+
+
+        //gull
+
+        model = glm::mat4 (1.0f);
+        model = glm::translate(model, glm::vec3(-0.9, 0.8, 2));
+        model = rotate(model, (float)glfwGetTime()*4,glm::vec3(0.0, 0.001, 0.0));
+     //   model = glm::rotate(model, glm::radians((float)(25.0 * sin(1.0 + 2*glfwGetTime()))), glm::vec3(1.0f, 0.0f, (sin(glfwGetTime())+1)/2));
+         model = glm::translate(model, glm::vec3(-0.45, 0.8, 0.00001));
+        model = glm::scale(model, glm::vec3(0.003f));
+        ourShader.setMat4("model", model);
+        moon.Draw(ourShader);
+
 
         //moon
         moonShader.use();
