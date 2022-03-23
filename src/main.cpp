@@ -33,6 +33,8 @@ unsigned int loadTexture(const char *path);
 
 unsigned int loadCubemap(vector<std::string> skyboxFaces);
 
+void renderQuad();
+
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -40,6 +42,9 @@ bool lightOn = false;
 bool lKeyPressed = false;
 bool pointLightOn = true;
 bool kKeyPressed = false;
+bool hdr = true;
+bool hdrKeyPressed = false;
+float exposure = 0.2f;
 
 // camera
 
@@ -199,13 +204,13 @@ int main() {
     DirLight& dirLight = programState->dirLight;
     dirLight.direction = glm::vec3(-40.0f, -20.0f, 70.0f);
     dirLight.ambient = glm::vec3(0.04);
-    dirLight.diffuse = glm::vec3(0.3, 0.15, 0.0);
+    dirLight.diffuse = glm::vec3(0.3, 0.1, 0.0);
     dirLight.specular = glm::vec3(0.4, 0.3, 0.2);
 
 
     PointLight& pointLight = programState->pointLight;
     //pointLight.position = glm::vec3(2.6, 1.6, 0.0);
-    pointLight.ambient = glm::vec3(0.3);
+    pointLight.ambient = glm::vec3(1.5);
     pointLight.diffuse = glm::vec3(0.9);
     pointLight.specular = glm::vec3(1.0);
     pointLight.constant = 0.2f;
@@ -235,6 +240,7 @@ int main() {
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
     Shader blendingShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
     Shader moonShader(FileSystem::getPath("resources/shaders/moon.vs").c_str(), FileSystem::getPath("resources/shaders/moon.fs").c_str());
+    Shader hdrShader(FileSystem::getPath("resources/shaders/hdr.vs").c_str(), FileSystem::getPath("resources/shaders/hdr.fs").c_str());
 
     //cube
     float vertices[] = {
@@ -444,6 +450,33 @@ int main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     //glBindVertexArray(0);
 
+    // configure floating point framebuffer
+    // ------------------------------------
+    unsigned int hdrFBO;
+    glGenFramebuffers(1, &hdrFBO);
+    // create floating point color buffer
+    unsigned int colorBuffer;
+    glGenTextures(1, &colorBuffer);
+    glBindTexture(GL_TEXTURE_2D, colorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // create depth buffer (renderbuffer)
+    unsigned int rboDepth;
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+    // attach buffers
+    glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBuffer, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    hdrShader.use();
+    hdrShader.setInt("hdrBuffer", 0);
+
     //load box textures
     unsigned int diffuseMap  = loadTexture(FileSystem::getPath("resources/textures/box.png").c_str());
     unsigned int specularMap = loadTexture(FileSystem::getPath("resources/textures/box_specular.png").c_str());
@@ -592,7 +625,7 @@ int main() {
            ourShader.setFloat("pointLight" + std::to_string(i) + ".constant", pointLight.constant);
            ourShader.setFloat("pointLight" + std::to_string(i) + ".linear", pointLight.linear);
            ourShader.setFloat("pointLight" + std::to_string(i) + ".quadratic", pointLight.quadratic);
-           if(i==2 || i==5){ //broken lamp
+           if(i==4 || i==7){ //broken lamp
                double r = ((double) rand() / (RAND_MAX));
                if(r<0.5)
                    r=0;
@@ -602,9 +635,9 @@ int main() {
        }
 
 
-        ourShader.setVec3("lampion.ambient", glm::vec3(0.3, 0.2, 0.0));
+        ourShader.setVec3("lampion.ambient", glm::vec3(2.0, 1.5, 0.1));
         ourShader.setVec3("lampion.diffuse", pointLight.diffuse);
-        ourShader.setVec3("lampion.specular", glm::vec3(0.6, 0.5, 0.4));
+        ourShader.setVec3("lampion.specular", glm::vec3(0.7, 0.6, 0.5));
         ourShader.setFloat("lampion.constant", pointLight.constant);
         ourShader.setFloat("lampion.linear", pointLight.linear);
         ourShader.setFloat("lampion.quadratic", pointLight.quadratic);
@@ -635,6 +668,11 @@ int main() {
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
 
+
+        // 1. render scene into floating point framebuffer
+        // -----------------------------------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       /*  if (programState->ImGuiEnabled)
             DrawImGui(programState);*/
@@ -713,7 +751,6 @@ int main() {
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
-
         // floor setup
         //ourShader.setVec3("pointLight.specular", 0.01f, 0.03f, 0.01f);
         ourShader.setVec3("dirLight.specular", 0.01f, 0.03f, 0.01f);
@@ -758,7 +795,6 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
         glDisable(GL_CULL_FACE);
 
-
         //grass
         blendingShader.use();
         glBindVertexArray(transparentVAO);
@@ -801,6 +837,19 @@ int main() {
         glDepthMask(GL_TRUE);
         glDepthFunc(GL_LESS);
 
+
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 2. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
+        // --------------------------------------------------------------------------------------------------------------------------
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        hdrShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffer);
+        hdrShader.setInt("hdr", hdr);
+        hdrShader.setFloat("exposure", exposure);
+        renderQuad();
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -860,6 +909,29 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
     {
         kKeyPressed = false;
+    }
+
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !hdrKeyPressed)
+    {
+        hdr = !hdr;
+        hdrKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
+    {
+        hdrKeyPressed = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+    {
+        if (exposure > 0.0f)
+            exposure -= 0.02f;
+        else
+            exposure = 0.0f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
+    {
+        exposure += 0.02f;
     }
 }
 
@@ -1024,4 +1096,35 @@ unsigned int loadCubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+// renderQuad() renders a 1x1 XY quad in NDC
+// -----------------------------------------
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+                // positions        // texture Coords
+                -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+                -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+                1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+                1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }
