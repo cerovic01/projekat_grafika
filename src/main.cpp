@@ -30,8 +30,11 @@ void processInput(GLFWwindow *window);
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 //void key_callback2(GLFWwindow *window, int key, int scancode, int action, int mod);
 unsigned int loadTexture(const char *path);
+unsigned int loadTexture1(char const * path, bool gammaCorrection);
 
 unsigned int loadCubemap(vector<std::string> skyboxFaces);
+
+void renderQuad();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -40,6 +43,11 @@ bool lightOn = false;
 bool lKeyPressed = false;
 bool pointLightOn = true;
 bool kKeyPressed = false;
+bool hdr = true;
+bool hdrKeyPressed = false;
+float exposure = 0.2f;
+bool bloom = true;
+bool bloomKeyPressed = false;
 
 // camera
 
@@ -82,6 +90,7 @@ struct SpotLight {
     glm::vec3 diffuse;
     glm::vec3 specular;
 };
+void setShader(Shader ourShader, DirLight dirLight, PointLight pointLight, SpotLight spotLight, vector<glm::vec3> lightPos);
 
 struct ProgramState {
     glm::vec3 clearColor = glm::vec3(0);
@@ -199,13 +208,13 @@ int main() {
     DirLight& dirLight = programState->dirLight;
     dirLight.direction = glm::vec3(-40.0f, -20.0f, 70.0f);
     dirLight.ambient = glm::vec3(0.04);
-    dirLight.diffuse = glm::vec3(0.3, 0.15, 0.0);
-    dirLight.specular = glm::vec3(1.0, 1.0, 1.0);
+    dirLight.diffuse = glm::vec3(0.3, 0.1, 0.0);
+    dirLight.specular = glm::vec3(0.4, 0.3, 0.2);
 
 
     PointLight& pointLight = programState->pointLight;
     //pointLight.position = glm::vec3(2.6, 1.6, 0.0);
-    pointLight.ambient = glm::vec3(0.3);
+    pointLight.ambient = glm::vec3(1.5);
     pointLight.diffuse = glm::vec3(0.9);
     pointLight.specular = glm::vec3(1.0);
     pointLight.constant = 0.2f;
@@ -216,7 +225,7 @@ int main() {
     SpotLight& spotLight = programState->spotLight;
     spotLight.position = programState->camera.Position;
     spotLight.direction = programState->camera.Front;
-    spotLight.ambient = glm::vec3 (1.0f, 1.0f, 1.0f);
+    spotLight.ambient = glm::vec3 (0.5f);
     spotLight.diffuse = glm::vec3 (0.7f, 0.7f, 0.7f);
     spotLight.specular = glm::vec3 (0.5f, 0.5f, 0.5f);
     spotLight.constant = 1.0f;
@@ -235,6 +244,10 @@ int main() {
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
     Shader blendingShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
     Shader moonShader(FileSystem::getPath("resources/shaders/moon.vs").c_str(), FileSystem::getPath("resources/shaders/moon.fs").c_str());
+
+    Shader lightShader (FileSystem::getPath("resources/shaders/light.vs").c_str(), FileSystem::getPath("resources/shaders/light.fs").c_str());
+    Shader shaderBlur(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
+    Shader shaderBloomFinal(FileSystem::getPath("resources/shaders/bloomfinal.vs").c_str(), FileSystem::getPath("resources/shaders/bloomfinal.fs").c_str());
 
     //cube
     float vertices[] = {
@@ -444,6 +457,67 @@ int main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     //glBindVertexArray(0);
 
+    // configure (floating point) framebuffers
+    // ---------------------------------------
+    unsigned int hdrFBO;
+    glGenFramebuffers(1, &hdrFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+    // create 2 floating point color buffers (1 for normal rendering, other for brightness threshold values)
+    unsigned int colorBuffers[2];
+    glGenTextures(2, colorBuffers);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindTexture(GL_TEXTURE_2D, colorBuffers[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);  // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // attach texture to framebuffer
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, colorBuffers[i], 0);
+    }
+    // create and attach depth buffer (renderbuffer)
+    unsigned int rboDepth;
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCR_WIDTH, SCR_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    // tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
+    unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, attachments);
+    // finally check if framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // ping-pong-framebuffer for blurring
+    unsigned int pingpongFBO[2];
+    unsigned int pingpongColorbuffers[2];
+    glGenFramebuffers(2, pingpongFBO);
+    glGenTextures(2, pingpongColorbuffers);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
+        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // we clamp to the edge as the blur filter would otherwise sample repeated texture values!
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpongColorbuffers[i], 0);
+        // also check if framebuffers are complete (no need for depth buffer)
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cout << "Framebuffer not complete!" << std::endl;
+    }
+
+    // shader configuration
+    shaderBlur.use();
+    shaderBlur.setInt("image", 0);
+    shaderBloomFinal.use();
+    shaderBloomFinal.setInt("scene", 0);
+    shaderBloomFinal.setInt("bloomBlur", 1);
+
+
     //load box textures
     unsigned int diffuseMap  = loadTexture(FileSystem::getPath("resources/textures/box.png").c_str());
     unsigned int specularMap = loadTexture(FileSystem::getPath("resources/textures/box_specular.png").c_str());
@@ -468,24 +542,21 @@ int main() {
     skyboxShader.setInt("skybox", 0);
 
     //load put textures
-    unsigned int putDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/stone_box.jpg").c_str());
+    unsigned int putDiffuseMap = loadTexture1(FileSystem::getPath("resources/textures/stone_box.jpg").c_str(), true);
     unsigned int putSpecularMap = loadTexture(FileSystem::getPath("resources/textures/stone_specular.png").c_str());
 
     //load floor textures
-    unsigned int floorDiffuseMap = loadTexture(FileSystem::getPath("resources/textures/trava.jpg").c_str());
+    unsigned int floorDiffuseMap = loadTexture1(FileSystem::getPath("resources/textures/trava.jpg").c_str(), true);
     unsigned int floorSpecularMap = loadTexture(FileSystem::getPath("resources/textures/travaspec.png").c_str());
 
     //load grass texture
-    unsigned int transparentTexture = loadTexture(FileSystem::getPath("resources/textures/grass.png").c_str());
+    unsigned int transparentTexture = loadTexture1(FileSystem::getPath("resources/textures/grass.png").c_str(), true);
     unsigned int transparentTexture1 = loadTexture(FileSystem::getPath("resources/textures/grass1.png").c_str());
 
     blendingShader.use();
     blendingShader.setInt("texture1", 0);
 
     vector<glm::vec3> grassPos {
-        //glm::vec3 (-1.5f, 0.0f, -2.0f),
-        //glm::vec3 (1.5f, 0.0f, -2.0f),
-        //glm::vec3 (2.5f, 0.0f, -2.0f),
             glm::vec3(2.3, 0, 0.15),
             glm::vec3(-1.2, 0, 2.15),
             glm::vec3(2.3, 0, -4.15),
@@ -574,170 +645,48 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-        // don't forget to enable shader before setting uniforms
-        ourShader.use();
+        setShader(ourShader, dirLight, pointLight, spotLight, lightPos);
+        setShader(lightShader, dirLight, pointLight, spotLight, lightPos);
 
-        ourShader.setVec3("dirLight.direction", dirLight.direction);
-        ourShader.setVec3("dirLight.ambient", dirLight.ambient);
-        ourShader.setVec3("dirLight.diffuse", dirLight.diffuse);
-        ourShader.setVec3("dirLight.specular", dirLight.specular);
-
-
-       // pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
-
-       ourShader.setInt("pointLightOn", pointLightOn);
-       ourShader.setVec3("pointLight1.position", lightPos[0]);
-       ourShader.setVec3("pointLight1.ambient", pointLight.ambient);
-       ourShader.setVec3("pointLight1.diffuse", pointLight.diffuse);
-       ourShader.setVec3("pointLight1.specular", pointLight.specular);
-       ourShader.setFloat("pointLight1.constant", pointLight.constant);
-       ourShader.setFloat("pointLight1.linear", pointLight.linear);
-       ourShader.setFloat("pointLight1.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight2.position", lightPos[1]);
-        ourShader.setVec3("pointLight2.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight2.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight2.specular", pointLight.specular);
-        ourShader.setFloat("pointLight2.constant", pointLight.constant);
-        ourShader.setFloat("pointLight2.linear", pointLight.linear);
-        ourShader.setFloat("pointLight2.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight3.position", lightPos[2]);
-        ourShader.setVec3("pointLight3.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight3.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight3.specular", pointLight.specular);
-        ourShader.setFloat("pointLight3.constant", pointLight.constant);
-        ourShader.setFloat("pointLight3.linear", pointLight.linear);
-        ourShader.setFloat("pointLight3.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight4.position", lightPos[3]);
-        ourShader.setVec3("pointLight4.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight4.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight4.specular", pointLight.specular);
-        ourShader.setFloat("pointLight4.constant", pointLight.constant);
-        ourShader.setFloat("pointLight4.linear", pointLight.linear);
-        ourShader.setFloat("pointLight4.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight5.position", lightPos[4]);
-        ourShader.setVec3("pointLight5.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight5.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight5.specular", pointLight.specular);
-        ourShader.setFloat("pointLight5.constant", pointLight.constant);
-        ourShader.setFloat("pointLight5.linear", pointLight.linear);
-        ourShader.setFloat("pointLight5.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight6.position", lightPos[5]);
-        ourShader.setVec3("pointLight6.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight6.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight6.specular", pointLight.specular);
-        ourShader.setFloat("pointLight6.constant", pointLight.constant);
-        ourShader.setFloat("pointLight6.linear", pointLight.linear);
-        ourShader.setFloat("pointLight6.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight7.position", lightPos[6]);
-        ourShader.setVec3("pointLight7.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight7.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight7.specular", pointLight.specular);
-        ourShader.setFloat("pointLight7.constant", pointLight.constant);
-        ourShader.setFloat("pointLight7.linear", pointLight.linear);
-        ourShader.setFloat("pointLight7.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight8.position", lightPos[7]);
-        ourShader.setVec3("pointLight8.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight8.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight8.specular", pointLight.specular);
-        ourShader.setFloat("pointLight8.constant", pointLight.constant);
-        ourShader.setFloat("pointLight8.linear", pointLight.linear);
-        ourShader.setFloat("pointLight8.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight9.position", lightPos[8]);
-        ourShader.setVec3("pointLight9.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight9.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight9.specular", pointLight.specular);
-        ourShader.setFloat("pointLight9.constant", pointLight.constant);
-        ourShader.setFloat("pointLight9.linear", pointLight.linear);
-        ourShader.setFloat("pointLight9.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("pointLight10.position", lightPos[9]);
-        ourShader.setVec3("pointLight10.ambient", pointLight.ambient);
-        ourShader.setVec3("pointLight10.diffuse", pointLight.diffuse);
-        ourShader.setVec3("pointLight10.specular", pointLight.specular);
-        ourShader.setFloat("pointLight10.constant", pointLight.constant);
-        ourShader.setFloat("pointLight10.linear", pointLight.linear);
-        ourShader.setFloat("pointLight10.quadratic", pointLight.quadratic);
-
-        ourShader.setVec3("lampion.ambient", glm::vec3(0.3, 0.2, 0.0));
-        ourShader.setVec3("lampion.diffuse", pointLight.diffuse);
-        ourShader.setVec3("lampion.specular", glm::vec3(0.6));
-        ourShader.setFloat("lampion.constant", pointLight.constant);
-        ourShader.setFloat("lampion.linear", pointLight.linear);
-        ourShader.setFloat("lampion.quadratic", pointLight.quadratic);
-
-
-        ourShader.setVec3("viewPosition", programState->camera.Position);
-        ourShader.setFloat("material.shininess", 32.0f);
-
-        ourShader.setInt("lightOn", lightOn);
-        ourShader.setVec3("spotLight.position", programState->camera.Position);
-        ourShader.setVec3("spotLight.direction", programState->camera.Front);
-        ourShader.setVec3("spotLight.ambient", spotLight.ambient);
-        ourShader.setVec3("spotLight.diffuse", spotLight.diffuse);
-        ourShader.setVec3("spotLight.specular", spotLight.specular);
-        ourShader.setFloat("spotLight.constant", spotLight.constant);
-        ourShader.setFloat("spotLight.linear", spotLight.linear);
-        ourShader.setFloat("spotLight.quadratic", spotLight.quadratic);
-        ourShader.setFloat("spotLight.cutOff", spotLight.cutOff);
-        ourShader.setFloat("spotLight.outerCutOff", spotLight.outerCutOff);
-
-
-
-        // view/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
-                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = programState->camera.GetViewMatrix();
-
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
-
+        // 1. render scene into floating point framebuffer
+        // -----------------------------------------------
+        glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       /*  if (programState->ImGuiEnabled)
             DrawImGui(programState);*/
 
         //lampion
+        lightShader.use();
         glm::mat4 model = glm::mat4 (1.0f);
         model = glm::translate(model, glm::vec3(0.2, 1.15, -18.0));
         model = glm::scale(model, glm::vec3(0.6f));
         model = glm::translate(model, glm::vec3(0.0f, 1.32f, 0.0f));
-        model = glm::rotate(model, glm::radians((float)(25.0 * sin(1.0 + 2*glfwGetTime()))), glm::vec3(1.0f, 0.0f, (sin(glfwGetTime())+1)/2));
+        model = glm::rotate(model, glm::radians((float)(25.0 * sin(1.0 + 2*currentFrame))), glm::vec3(1.0f, 0.0f, (sin(currentFrame)+1)/2));
         model = glm::translate(model, glm::vec3(0.0f, -1.32f, 0.0f));
 
         glm::vec3 pointLightPositions = glm::vec3(model * glm::vec4(0.0f, 0.2f, 0.0f, 1.0f));
+        lightShader.setVec3("lampion.position", pointLightPositions);
+
+        lightShader.setMat4("model", model);
+        lampion.Draw(lightShader);
+
+        ourShader.use();
         ourShader.setVec3("lampion.position", pointLightPositions);
 
-        ourShader.setMat4("model", model);
-        lampion.Draw(ourShader);
-
-
         //lamp
+        lightShader.use();
         for (unsigned int i = 0; i < lampPos.size(); i++) {
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, lampPos[i]);
             model = glm::scale(model, glm::vec3(0.2f));
-            ourShader.setMat4("model", model);
-            lamp.Draw(ourShader);
+            lightShader.setMat4("model", model);
+            lamp.Draw(lightShader);
         }
 
 
-        //house
-        model = glm::mat4 (1.0f);
-        model = glm::translate(model, glm::vec3(1.0, -0.335, -21.0));
-        model = rotate(model, glm::radians(180.0f),glm::vec3(0.0, 1.0, 0.0));
-        model = glm::scale(model, glm::vec3(0.2f));
-        ourShader.setMat4("model", model);
-        house.Draw(ourShader);
-
         //gull
-
+        lightShader.use();
         model = glm::mat4 (1.0f);
         model = glm::translate(model, glm::vec3(-0.9, 0.8, 2));
         model = rotate(model, (float)glfwGetTime()*4,glm::vec3(0.0, 0.001, 0.0));
@@ -745,17 +694,31 @@ int main() {
      //   model = glm::rotate(model, glm::radians((float)(25.0 * sin(1.0 + 2*glfwGetTime()))), glm::vec3(1.0f, 0.0f, (sin(glfwGetTime())+1)/2));
          model = glm::translate(model, glm::vec3(-0.45, 0.8, 0.00001));
         model = glm::scale(model, glm::vec3(0.003f));
-        ourShader.setMat4("model", model);
-        moon.Draw(ourShader);
+        lightShader.setMat4("model", model);
+        moon.Draw(lightShader);
+
 
         //moon
         moonShader.use();
+        // view/projection transformations
+        glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
+                                                (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = programState->camera.GetViewMatrix();
         moonShader.setMat4("projection", projection);
         moonShader.setMat4("view", view);
         model = glm::mat4 (1.0f);
         model = glm::translate(model, glm::vec3(40.0f, 20.0f, -70.0f));
         moonShader.setMat4("model", model);
         moon.Draw(moonShader);
+
+        //house
+        ourShader.use();
+        model = glm::mat4 (1.0f);
+        model = glm::translate(model, glm::vec3(1.0, -0.335, -21.0));
+        model = rotate(model, glm::radians(180.0f),glm::vec3(0.0, 1.0, 0.0));
+        model = glm::scale(model, glm::vec3(0.2f));
+        ourShader.setMat4("model", model);
+        house.Draw(ourShader);
 
         //draw cube
         ourShader.use();
@@ -771,11 +734,10 @@ int main() {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, specularMap);
 
-        ourShader.setFloat("material.shininess", 200.0f);
+        ourShader.setFloat("material.shininess", 800.0f);
 
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-
 
         // floor setup
         //ourShader.setVec3("pointLight.specular", 0.01f, 0.03f, 0.01f);
@@ -821,7 +783,6 @@ int main() {
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void*)0);
         glDisable(GL_CULL_FACE);
 
-
         //grass
         blendingShader.use();
         glBindVertexArray(transparentVAO);
@@ -844,11 +805,6 @@ int main() {
         }
 
 
-      //  glBindTexture(GL_TEXTURE_2D, transparentTexture1);
-     //   model = glm::translate(model,  glm::vec3 (4.6f, 0.0f, -0.3f));
-       // blendingShader.setMat4("model", model);
-      //  glDrawArrays(GL_TRIANGLES, 0, 6);
-
         //draw skybox
         glDepthMask(GL_FALSE);
         glDepthFunc(GL_LEQUAL);
@@ -864,6 +820,39 @@ int main() {
         glDepthMask(GL_TRUE);
         glDepthFunc(GL_LESS);
 
+
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 2. blur bright fragments with two-pass Gaussian Blur
+        // --------------------------------------------------
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+        shaderBlur.use();
+        for (unsigned int i = 0; i < amount; i++)
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal]);
+            shaderBlur.setInt("horizontal", horizontal);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBuffers[1] : pingpongColorbuffers[!horizontal]);  // bind texture of other framebuffer (or scene if first iteration)
+            renderQuad();
+            horizontal = !horizontal;
+            if (first_iteration)
+                first_iteration = false;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 3. now render floating point color buffer to 2D quad and tonemap HDR colors to default framebuffer's (clamped) color range
+        // --------------------------------------------------------------------------------------------------------------------------
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        shaderBloomFinal.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBuffers[0]);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, pingpongColorbuffers[!horizontal]);
+        shaderBloomFinal.setInt("hdr", hdr);
+        shaderBloomFinal.setInt("bloom", bloom);
+        shaderBloomFinal.setFloat("exposure", exposure);
+        renderQuad();
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -923,6 +912,39 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_RELEASE)
     {
         kKeyPressed = false;
+    }
+
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !hdrKeyPressed)
+    {
+        hdr = !hdr;
+        hdrKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
+    {
+        hdrKeyPressed = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+    {
+        if (exposure > 0.0f)
+            exposure -= 0.02f;
+        else
+            exposure = 0.0f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
+    {
+        exposure += 0.02f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !bloomKeyPressed)
+    {
+        bloom = !bloom;
+        bloomKeyPressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE)
+    {
+        bloomKeyPressed = false;
     }
 }
 
@@ -1006,11 +1028,11 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
     }
 
     if (key == GLFW_KEY_F2 && action == GLFW_PRESS) {
-              glEnable(GL_MULTISAMPLE);
+        glEnable(GL_MULTISAMPLE);
     }
     if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
-           glDisable(GL_MULTISAMPLE);
-          }
+        glDisable(GL_MULTISAMPLE);
+    }
 }
 
 //void key_callback2(GLFWwindow *window, int key, int scancode, int action, int mod) {
@@ -1087,4 +1109,143 @@ unsigned int loadCubemap(vector<std::string> faces)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
+}
+
+// renderQuad() renders a 1x1 XY quad in NDC
+// -----------------------------------------
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+                // positions        // texture Coords
+                -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+                -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+                1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+                1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+unsigned int loadTexture1(char const * path, bool gammaCorrection)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
+    if (data)
+    {
+        GLenum internalFormat;
+        GLenum dataFormat;
+        if (nrComponents == 1)
+        {
+            internalFormat = dataFormat = GL_RED;
+        }
+        else if (nrComponents == 3)
+        {
+            internalFormat = gammaCorrection ? GL_SRGB : GL_RGB;
+            dataFormat = GL_RGB;
+        }
+        else if (nrComponents == 4)
+        {
+            internalFormat = gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA;
+            dataFormat = GL_RGBA;
+        }
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        stbi_image_free(data);
+    }
+
+    return textureID;
+}
+
+void setShader(Shader ourShader, DirLight dirLight, PointLight pointLight, SpotLight spotLight, vector<glm::vec3> lightPos){
+    ourShader.use();
+
+    ourShader.setVec3("dirLight.direction", dirLight.direction);
+    ourShader.setVec3("dirLight.ambient", dirLight.ambient);
+    ourShader.setVec3("dirLight.diffuse", dirLight.diffuse);
+    ourShader.setVec3("dirLight.specular", dirLight.specular);
+
+    ourShader.setInt("pointLightOn", pointLightOn);
+
+    for(unsigned int i=1; i<=10; ++i){
+        ourShader.setVec3("pointLight" + std::to_string(i) + ".position", lightPos[i-1]);
+        ourShader.setVec3("pointLight" + std::to_string(i) + ".ambient", pointLight.ambient);
+        ourShader.setVec3("pointLight" + std::to_string(i) + ".diffuse", pointLight.diffuse);
+        ourShader.setVec3("pointLight" + std::to_string(i) + ".specular", pointLight.specular);
+        ourShader.setFloat("pointLight" + std::to_string(i) + ".constant", pointLight.constant);
+        ourShader.setFloat("pointLight" + std::to_string(i) + ".linear", pointLight.linear);
+        ourShader.setFloat("pointLight" + std::to_string(i) + ".quadratic", pointLight.quadratic);
+        if(i==4 || i==7){ //broken lamp
+            double r = ((double) rand() / (RAND_MAX));
+            if(r<0.5)
+                r=0;
+            else r=1;
+            ourShader.setVec3("pointLight" + std::to_string(i) + ".ambient", glm::vec3((sin(3* glfwGetTime())+1)/6.67 * r));
+        }
+    }
+
+
+    ourShader.setVec3("lampion.ambient", glm::vec3(2.0, 1.5, 0.1));
+    ourShader.setVec3("lampion.diffuse", pointLight.diffuse);
+    ourShader.setVec3("lampion.specular", glm::vec3(0.7, 0.6, 0.5));
+    ourShader.setFloat("lampion.constant", pointLight.constant);
+    ourShader.setFloat("lampion.linear", pointLight.linear);
+    ourShader.setFloat("lampion.quadratic", pointLight.quadratic);
+
+
+    ourShader.setVec3("viewPosition", programState->camera.Position);
+    ourShader.setFloat("material.shininess", 32.0f);
+
+    ourShader.setInt("lightOn", lightOn);
+    ourShader.setVec3("spotLight.position", programState->camera.Position);
+    ourShader.setVec3("spotLight.direction", programState->camera.Front);
+    ourShader.setVec3("spotLight.ambient", spotLight.ambient);
+    ourShader.setVec3("spotLight.diffuse", spotLight.diffuse);
+    ourShader.setVec3("spotLight.specular", spotLight.specular);
+    ourShader.setFloat("spotLight.constant", spotLight.constant);
+    ourShader.setFloat("spotLight.linear", spotLight.linear);
+    ourShader.setFloat("spotLight.quadratic", spotLight.quadratic);
+    ourShader.setFloat("spotLight.cutOff", spotLight.cutOff);
+    ourShader.setFloat("spotLight.outerCutOff", spotLight.outerCutOff);
+
+
+
+    // view/projection transformations
+    glm::mat4 projection = glm::perspective(glm::radians(programState->camera.Zoom),
+                                            (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 view = programState->camera.GetViewMatrix();
+
+    ourShader.setMat4("projection", projection);
+    ourShader.setMat4("view", view);
 }
