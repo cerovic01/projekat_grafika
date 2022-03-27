@@ -250,7 +250,7 @@ int main() {
     Shader lightShader (FileSystem::getPath("resources/shaders/light.vs").c_str(), FileSystem::getPath("resources/shaders/light.fs").c_str());
     Shader shaderBlur(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
     Shader shaderBloomFinal(FileSystem::getPath("resources/shaders/bloomfinal.vs").c_str(), FileSystem::getPath("resources/shaders/bloomfinal.fs").c_str());
-    Shader Normalshader(FileSystem::getPath("resources/shaders/4.normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/4.normal_mapping.fs").c_str());
+    Shader Normalshader(FileSystem::getPath("resources/shaders/normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/normal_mapping.fs").c_str());
     //cube
     float vertices[] = {
             // positions          // normals           // texture coords
