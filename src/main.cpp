@@ -36,7 +36,7 @@ unsigned int loadCubemap(vector<std::string> skyboxFaces);
 
 void renderQuad();
 void renderQuad2();
-
+void renderQuad3();
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
@@ -50,6 +50,7 @@ float exposure = 0.2f;
 bool bloom = true;
 bool bloomKeyPressed = false;
 bool antialiasing=true; //  DODAOO
+float heightScale = 0.1;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -250,7 +251,8 @@ int main() {
     Shader lightShader (FileSystem::getPath("resources/shaders/light.vs").c_str(), FileSystem::getPath("resources/shaders/light.fs").c_str());
     Shader shaderBlur(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
     Shader shaderBloomFinal(FileSystem::getPath("resources/shaders/bloomfinal.vs").c_str(), FileSystem::getPath("resources/shaders/bloomfinal.fs").c_str());
-    Shader Normalshader(FileSystem::getPath("resources/shaders/normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/normal_mapping.fs").c_str());
+    Shader Normalshader(FileSystem::getPath("resources/shaders/4.normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/4.normal_mapping.fs").c_str());
+    Shader Parshader(FileSystem::getPath("resources/shaders/5.1.parallax_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/5.1.parallax_mapping.fs").c_str());
     //cube
     float vertices[] = {
             // positions          // normals           // texture coords
@@ -636,6 +638,19 @@ int main() {
     Normalshader.setInt("NormaldiffuseMap", 0);
     Normalshader.setInt("normal1Map", 1);
 
+    unsigned int PardiffuseMap = loadTexture(FileSystem::getPath("resources/textures/bricks2.jpg").c_str());
+    unsigned int ParnormalMap  = loadTexture(FileSystem::getPath("resources/textures/bricks2_normal.jpg").c_str());
+    unsigned int ParheightMap  = loadTexture(FileSystem::getPath("resources/textures/bricks2_disp.jpg").c_str());
+
+
+    // shader configuration
+    // --------------------
+    Parshader.use();
+    Parshader.setInt("PardiffuseMap", 0);
+    Parshader.setInt("ParnormalMap", 1);
+    Parshader.setInt("PardepthMap", 2);
+
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)) {
@@ -750,6 +765,27 @@ int main() {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normal1Map);
         renderQuad2();
+
+        //zid2
+
+        Parshader.use();
+        Parshader.setMat4("projection", projection);
+        Parshader.setMat4("view", view);
+        // render parallax-mapped quad
+        glm::mat4 model1 = glm::mat4(1.0f);
+        Parshader.setMat4("model", model1);
+        Parshader.setVec3("viewPos", camera.Position);
+        Parshader.setVec3("lightPos", 0.5f, 1.0f, 0.3f);
+        Parshader.setFloat("heightScale", heightScale); // adjust with Q and E keys
+        std::cout << heightScale << std::endl;
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, PardiffuseMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, ParnormalMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, ParheightMap);
+        renderQuad3();
+
 
         //draw cube
         ourShader.use();
@@ -944,11 +980,11 @@ void renderQuad2()
         tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
         tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
         tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
+        tangent1 = glm::normalize(tangent1);
         bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
         bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
         bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-
+        bitangent1 = glm::normalize(bitangent1);
         // triangle 2
         // ----------
         edge1 = pos3 - pos1;
@@ -961,12 +997,12 @@ void renderQuad2()
         tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
         tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
         tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
+        tangent1 = glm::normalize(tangent2);
 
         bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
         bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
         bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-
+        bitangent2 = glm::normalize(bitangent2);
 
         float quadVertices[] = {
                 // positions            // normal         // texcoords  // tangent                          // bitangent
@@ -1000,8 +1036,95 @@ void renderQuad2()
     glBindVertexArray(0);
 }
 
+unsigned int quad3VAO = 0;
+unsigned int quad3VBO;
+void renderQuad3()
+{
+    if (quad3VAO == 0)
+    {
+        // positions
+        glm::vec3 pos1(-3.50f,  1.4f, -19.5f);
+        glm::vec3 pos2(-3.50f, -0.50f, -19.5f);
+        glm::vec3 pos3( 0.5f, -0.50f, -19.5f);
+        glm::vec3 pos4( 0.5f,  1.4f, -19.5f);
+        // texture coordinates
+        glm::vec2 uv1(0.0f, 1.5f);
+        glm::vec2 uv2(0.0f, 0.0f);
+        glm::vec2 uv3(1.5f, 0.0f);
+        glm::vec2 uv4(1.5f, 1.5f);
+        // normal vector
+        glm::vec3 nm(0.0f, 0.0f, 1.0f);
 
+        // calculate tangent/bitangent vectors of both triangles
+        glm::vec3 tangent1, bitangent1;
+        glm::vec3 tangent2, bitangent2;
+        // triangle 1
+        // ----------
+        glm::vec3 edge1 = pos2 - pos1;
+        glm::vec3 edge2 = pos3 - pos1;
+        glm::vec2 deltaUV1 = uv2 - uv1;
+        glm::vec2 deltaUV2 = uv3 - uv1;
 
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent1 = glm::normalize(tangent1);
+        bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent1 = glm::normalize(bitangent1);
+        // triangle 2
+        // ----------
+        edge1 = pos3 - pos1;
+        edge2 = pos4 - pos1;
+        deltaUV1 = uv3 - uv1;
+        deltaUV2 = uv4 - uv1;
+
+        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+        tangent1 = glm::normalize(tangent2);
+
+        bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+        bitangent2 = glm::normalize(bitangent2);
+
+        float quadVertices[] = {
+                // positions            // normal         // texcoords  // tangent                          // bitangent
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
+
+                pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
+                pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
+        };
+        // configure plane VAO
+        glGenVertexArrays(1, &quad3VAO);
+        glGenBuffers(1, &quad3VBO);
+        glBindVertexArray(quad3VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quad3VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+    }
+    glBindVertexArray(quad3VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
 
 
 
@@ -1084,6 +1207,21 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE)
     {
         bloomKeyPressed = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+    {
+        if (heightScale > 0.0f)
+            heightScale -= 0.0005f;
+        else
+            heightScale = 0.0f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+    {
+        if (heightScale < 1.0f)
+            heightScale += 0.0005f;
+        else
+            heightScale = 1.0f;
     }
 
 }

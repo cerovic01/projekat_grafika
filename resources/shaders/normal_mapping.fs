@@ -46,9 +46,17 @@ struct Material {
 in vec2 TexCoords;
 in vec3 Normal;
 in vec3 FragPos;
-ub VS_OUT{
-    mat3 TBN;
-}fs_in;
+in VS_OUT {
+
+    vec3 TangentLightPos;
+    vec3 TangentViewPos;
+    vec3 TangentFragPos;
+} fs_in;
+uniform sampler2D NormaldiffuseMap;
+uniform sampler2D normal1Map;
+
+uniform vec3 lightPos;
+
 uniform DirLight dirLight;
 
 uniform PointLight pointLight1;
@@ -70,8 +78,7 @@ uniform SpotLight spotLight;
 uniform bool lightOn;
 uniform bool pointLightOn;
 
-uniform vec3 viewPosition;
-uniform vec3 lightPosition;
+uniform vec3 viewPos;
 
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir)
 {
@@ -137,11 +144,32 @@ vec3 CalcSpotLight(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 
 void main()
 {
-    vec3 normal = texture(normalMap, TexCoords).rgb;
-     normal = normal * 2.0 - 1.0;
+    vec3 normal = texture(normal1Map, fs_in.TexCoords).rgb;
 
-    vec3 viewDir = fs_in.TBN*normalize(viewPosition - FragPos);
-    dirLight=fs_in.TBN*normalize(lightPosition - FragPos);
+        normal = normalize(normal * 2.0 - 1.0);
+   //  vec3 color = texture(NormaldiffuseMap, TexCoords).rgb;
+         // ambient
+    //     vec3 ambient = 0.1 * color;
+
+  //      vec3 lightDir = normalize(fs_in.TangentLightPos - fs_in.TangentFragPos);
+    //        float diff = max(dot(lightDir, normal), 0.0);
+      //      vec3 diffuse = diff * color;
+
+
+
+
+
+    vec3 viewDir = normalize(fs_in.TangentViewPos - fs_in.TangentFragPos);
+
+   // vec3 reflectDir = reflect(-lightDir, normal);
+    //vec3 halfwayDir = normalize(lightDir + viewDir);
+   // float spec = pow(max(dot(normal, halfwayDir), 0.0), 32.0);
+
+
+  //  vec3 specular = vec3(0.2) * spec;
+
+
+
     vec3 result = CalcDirLight(dirLight, normal, viewDir);
 
     result += CalcPointLight(lampion, normal, FragPos, viewDir);
