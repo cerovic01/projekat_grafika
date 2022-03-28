@@ -224,7 +224,7 @@ int main() {
     spotLight.outerCutOff = glm::cos(glm::radians(13.0f));
 
     // build and compile shaders
-    Shader ourShader(FileSystem::getPath("resources/shaders/2.model_lighting.vs").c_str(), FileSystem::getPath("resources/shaders/2.model_lighting.fs").c_str());
+    Shader ourShader(FileSystem::getPath("resources/shaders/model_lighting.vs").c_str(), FileSystem::getPath("resources/shaders/model_lighting.fs").c_str());
     Shader skyboxShader(FileSystem::getPath("resources/shaders/skybox.vs").c_str(), FileSystem::getPath("resources/shaders/skybox.fs").c_str());
     Shader blendingShader(FileSystem::getPath("resources/shaders/blending.vs").c_str(), FileSystem::getPath("resources/shaders/blending.fs").c_str());
     Shader moonShader(FileSystem::getPath("resources/shaders/moon.vs").c_str(), FileSystem::getPath("resources/shaders/moon.fs").c_str());
@@ -233,7 +233,7 @@ int main() {
     Shader shaderBlur(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
     Shader shaderBloomFinal(FileSystem::getPath("resources/shaders/bloomfinal.vs").c_str(), FileSystem::getPath("resources/shaders/bloomfinal.fs").c_str());
     Shader Normalshader(FileSystem::getPath("resources/shaders/normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/normal_mapping.fs").c_str());
-    Shader Parshader(FileSystem::getPath("resources/shaders/5.1.parallax_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/5.1.parallax_mapping.fs").c_str());
+    Shader Parshader(FileSystem::getPath("resources/shaders/parallax_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/parallax_mapping.fs").c_str());
 
     //cube vertices
     float vertices[] = {
@@ -713,7 +713,7 @@ int main() {
         model = glm::mat4(1.0f);
         Normalshader.setMat4("model", model);
         Normalshader.setVec3("viewPos", programState->camera.Position);
-        Normalshader.setVec3("lightPos", 0.5f, 1.0f, 0.3f);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, NormaldiffuseMap);
         glActiveTexture(GL_TEXTURE1);
@@ -875,9 +875,15 @@ int main() {
     // de-allocate all resources
     glDeleteVertexArrays(1, &cubeVAO);
     glDeleteVertexArrays(1, &skyboxVAO);
+    glDeleteVertexArrays(1, &floorVAO);
+    glDeleteVertexArrays(1, &putVAO);
+    glDeleteVertexArrays(1, &transparentVAO);
+
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &skyboxVBO);
-
+    glDeleteBuffers(1, &floorVBO);
+    glDeleteBuffers(1, &putVBO);
+    glDeleteBuffers(1, &transparentVBO);
 
     // terminate, clearing all previously allocated GLFW resources.
     glfwTerminate();
