@@ -251,7 +251,7 @@ int main() {
     Shader lightShader (FileSystem::getPath("resources/shaders/light.vs").c_str(), FileSystem::getPath("resources/shaders/light.fs").c_str());
     Shader shaderBlur(FileSystem::getPath("resources/shaders/blur.vs").c_str(), FileSystem::getPath("resources/shaders/blur.fs").c_str());
     Shader shaderBloomFinal(FileSystem::getPath("resources/shaders/bloomfinal.vs").c_str(), FileSystem::getPath("resources/shaders/bloomfinal.fs").c_str());
-    Shader Normalshader(FileSystem::getPath("resources/shaders/4.normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/4.normal_mapping.fs").c_str());
+    Shader Normalshader(FileSystem::getPath("resources/shaders/normal_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/normal_mapping.fs").c_str());
     Shader Parshader(FileSystem::getPath("resources/shaders/5.1.parallax_mapping.vs").c_str(), FileSystem::getPath("resources/shaders/5.1.parallax_mapping.fs").c_str());
     //cube
     float vertices[] = {
@@ -750,9 +750,11 @@ int main() {
         house.Draw(ourShader);
 
         //zid
+
         Normalshader.use();
-        Normalshader.setMat4("projection", projection);
-        Normalshader.setMat4("view", view);
+        setShader(Normalshader,dirLight,pointLight,spotLight,lightPos);
+      //  Normalshader.setMat4("projection", projection);
+      //  Normalshader.setMat4("view", view);
         // render normal-mapped quad
         //model = glm::translate(model, glm::vec3(1.0, -0.335, -210.0));
         model = glm::mat4(1.0f);
