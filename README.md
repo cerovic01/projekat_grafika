@@ -21,7 +21,8 @@ Todorović Todor 241/2019:<br>
 A - Anti Aliasing <br> 
 B - Normal mapping, Parallax Mapping
 <br><br>
-#link za snimka projekta
+# link  snimka projekta
+
 https://youtu.be/pwV1hSt9uD4
 
  ![img](img/Screenshot1.png)  ![img](img/Screenshot2.png) ![img](img/Screenshot3.png) 
