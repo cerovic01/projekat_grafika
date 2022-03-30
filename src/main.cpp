@@ -156,7 +156,7 @@ int main() {
 
     // glfw window creation
     // --------------------
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Projekat", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -730,7 +730,6 @@ int main() {
         Parshader.setVec3("viewPos", programState->camera.Position);
         Parshader.setVec3("lightPos", 0.5f, 1.0f, 0.3f);
         Parshader.setFloat("heightScale", heightScale); // adjust with Q and E keys
-        std::cout << heightScale << std::endl;
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, PardiffuseMap);
         glActiveTexture(GL_TEXTURE1);
@@ -1053,17 +1052,6 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
         glDisable(GL_MULTISAMPLE);
    }
-   // if(key == GLFW_KEY_M && action == GLFW_PRESS){
-    //    if (antialiasing) {
-     //       glDisable(GL_MULTISAMPLE);
-     //       antialiasing=!antialiasing;
-      //  }
-     //   else {
-      //      glEnable(GL_MULTISAMPLE);
-      //      antialiasing = !antialiasing;
-      //  }
-
-  //  }
 }
 
 unsigned int loadTexture(char const * path)
